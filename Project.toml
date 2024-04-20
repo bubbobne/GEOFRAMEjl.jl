@@ -1,0 +1,13 @@
+name = "GEOFRAMEjl"
+uuid = "8b75630a-cbbd-4d7f-8acd-259f47006da5"
+authors = ["Daniele Andreis"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.6.7"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
