@@ -1,6 +1,13 @@
 using TimeSeries
 
 
+function correctDateFormat(date_component)
+    date_component = replace(date_component, "mm" => "temporary_placeholder")
+    date_component = replace(date_component, "MM" => "mm")
+    date_component = replace(date_component, "temporary_placeholder" => "MM")
+    return date_component
+end
+
 """
     read_OMS_timeserie(path::String) -> TimeSeries
 
@@ -32,7 +39,7 @@ function read_OMS_timeserie(filepath)
 
         # Extract and correct the date format from the line starting with "Format,"
         format_line = findfirst(l -> startswith(l, "Format,"), lines)
-        date_format = replace(split(lines[format_line], ",")[2], "yyyy" => "yyyy", "dd" => "dd", "HH" => "HH", "mm" => "MM", "MM" => "mm")
+        date_format = correctDateFormat(split(lines[format_line], ",")[2])
 
         # Find where data starts; data lines start after "Format," line
         start_index = format_line + 1
