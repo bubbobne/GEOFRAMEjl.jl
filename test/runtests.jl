@@ -3,7 +3,9 @@ using Test
 using TimeSeries
 
 @testset "GEOFRAMEjl" begin
-    t = GEOFRAMEjl.read_OMS_timeserie("data/testOMS.csv")
+    data_path = joinpath(@__DIR__, "data", "testOMS.csv")
+    t = GEOFRAMEjl.read_OMS_timeserie(data_path)
     @test isapprox(values(t[Symbol("967")])[1], 99.068235, atol=1e-5)
-    @test GEOFRAMEjl.write_OMS_timeserie(" ") == "Write OMS!"
+    data_path = joinpath(@__DIR__, "data", "testWOMS.csv")
+    @test GEOFRAMEjl.write_OMS_timeserie(t,data_path)
 end
