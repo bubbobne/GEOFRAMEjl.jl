@@ -1,10 +1,10 @@
 @T,table
-Created,2024-04-23 21:32
+Created,2024-05-02 17:55
 Author,GEOFramejl package
 @H,timestamp,value_967
 ID,,967
 Type,Date,Double
-Format,yyyy-MM-dd HH:mm,,
+Format,yyyy-mm-dd HH:MM,,
 ,2017-01-01 01:00,99.06823511808976
 ,2017-01-01 02:00,99.02378629810697
 ,2017-01-01 03:00,98.97936090183222
