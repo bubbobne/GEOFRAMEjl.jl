@@ -16,7 +16,13 @@ jobs:
         uses: julia-actions/setup-julia@latest
         with:
           version: '1.x'
-
+          
+      - name: Install CompatHelper
+        run: |
+          julia -e '
+            using Pkg
+            Pkg.add("CompatHelper")
+            
       - name: Run CompatHelper
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
