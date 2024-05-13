@@ -3,6 +3,9 @@ using DataFrames
 import GeoDataFrames as GDF
 using ArchGDAL
 import GeoFormatTypes as GFT
+using LibGEOS
+using GeoArrays
+
 """
     create_grid(x_start, x_end, x_step, y_start, y_end, y_step, epsg_code)
 
@@ -67,13 +70,14 @@ Notes
     The function assumes that the input GeoDataFrame objects are properly formatted and that the polygons contain an id attribute for identification.
     Ensure that the coordinate reference system (CRS) of both GeoDataFrames matches or is appropriately handled before using this function to avoid inconsistencies in spatial queries.
     """
-function filter_points(grid_gdf, polygons_gdf)
+function filter_points(grid_gdf, polygons_gdf; buffer=1000)
     # Prepare a DataFrame to collect filtered points
     polygons_contains_any_point(grid_gdf, polygons_gdf)
-    filtered_points = DataFrame(geometry=[], polygon_id=Int[])
+    columns = names(grid_gdf)
+    filtered_points = DataFrame([col => Vector{eltype(grid_gdf[!, col])}() for col in columns])
     # Calculate the union of all polygons and apply a 1 km buffer
     union_polygon = reduce(LibGEOS.union, polygons_gdf.geometry)
-    buffered_union = LibGEOS.buffer(union_polygon, 1000)  # Assuming meters as unit
+    buffered_union = LibGEOS.buffer(union_polygon, buffer)  # Assuming meters as unit
     points_in_buffered_union = [i for (i, point) in enumerate(grid_gdf.geometry) if LibGEOS.contains(buffered_union, point)]
     if !isempty(points_in_buffered_union)
         append!(filtered_points, grid_gdf[points_in_buffered_union, :])
@@ -99,13 +103,22 @@ end
 
 
 function get_value_from_raster(grid_gdf, raster)
-
     function get_raster_value(point, raster)
         # Assuming point is a LibGEOS point geometry
         x, y = ArchGDAL.getpoint(point,0)
         # Get the pixel value at coordinates (x, y)
-        band = AG.getband(dataset, 1)
-        return ArchGDAL.readpixel(band, x, y)
+        try 
+            value = raster[x, y][1]
+            result = ismissing(value) ? -9999.0 : value
+            return Float16(result)
+        catch e
+            if isa(e, BoundsError)
+                # TODO check for env variables
+                return Float16(-9999.0)
+            else
+                println("An unexpected error occurred: $e")
+            end
+        end
     end
 
     # Append a new column for raster values

@@ -5,7 +5,6 @@
 ![Julia](https://img.shields.io/badge/-Julia-9558B2?style=for-the-badge&logo=julia&logoColor=white)
 
 
-
 `GEOFRAMEjl` is a Julia package designed to interact with GEOframe. It offers tools for reading GEOframe output files, evaluating goodness of fit, and preparing data.
 
 ## Installation
