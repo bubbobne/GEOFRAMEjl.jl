@@ -104,7 +104,8 @@ function get_value_from_raster(grid_gdf, raster)
         # Assuming point is a LibGEOS point geometry
         x, y = ArchGDAL.getpoint(point,0)
         # Get the pixel value at coordinates (x, y)
-        return ArchGDAL.readpixel(raster, x, y)
+        band = AG.getband(dataset, 1)
+        return ArchGDAL.readpixel(band, x, y)
     end
 
     # Append a new column for raster values
