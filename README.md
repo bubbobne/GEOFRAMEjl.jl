@@ -64,10 +64,18 @@ Create grids with customizable dimensions.
 
 ```julia
 using GEOFRAMEjl
-
-a =Geo.create_grid(614100,680300,500,5112800,5159000,500)
-save_grid(a,"./grid_kriging/grid.shp", 32632)
-
+import GeoDataFrames as GDF
+import  ArchGDAL  as GDAL
+using GeoArrays
+# create a squared grid
+b = 10000
+full_grid = Geo.create_grid(614100,680300,b,5112500,5159000,b)
+# read polygons 
+basins = GDF.read("./your_basin_file.shp")
+grid = Geo.filter_points(full_grid, basins,buffer=b)
+dem = GeoArrays.read("./your_dtm_file.tif", band=1)
+grid = Geo.get_value_from_raster(grid, dem)
+Geo.save_grid(grid,"./grid.shp", 32632)
 ```
 
 
