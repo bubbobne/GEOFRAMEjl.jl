@@ -45,6 +45,37 @@ sol = solve_reservoir(S_initial, P, E, b, c, σ, Δt)
 # Plot the results
 plot(sol.t, sol.u, xlabel="Time (days)", ylabel="Storage (cubic meters)", title="Reservoir Storage Over Time", legend=false)
 
+
+
+# Example usage
+S_initial = 1000.0
+s_max =1200
+P = [50.0, 45.0, 60.0, 70.0, 65.0, 55.0, 50.0, 45.0, 40.0, 35.0, 30.0, 25.0, 20.0, 15.0, 10.0, 5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0, 65.0]
+E = [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
+b = 0.0001
+c = 1.5
+σ = 1.0
+Δt = 1.0
+
+# Solve the reservoir equation
+sol_t = 1:30
+sol_u = []
+
+# Initial condition for the first time step
+
+for i in eachindex(sol_t)
+    sol = solve_reservoir(S_initial,s_max, P[1:i], E[1:i], b, c, σ, Δt)
+    push!(sol_u, sol.u[end][1])
+    global S_initial = sol.u[end][1]
+end
+
+# Plot the results
+plot(sol_t, sol_u, xlabel="Time (days)", ylabel="Storage (cubic meters)", title="Reservoir Storage Over Time", legend=false)
+
+
+
+
+
 """
 
 function solve_reservoir(S_initial,s_rootzone_max, P, E, b, c, σ, n_iter)
@@ -94,29 +125,4 @@ function solve_reservoir(S_initial,s_rootzone_max, P, E, b, c, σ, n_iter)
 end
 
 
-
-# Example usage
-S_initial = 1000.0
-s_max =1200
-P = [50.0, 45.0, 60.0, 70.0, 65.0, 55.0, 50.0, 45.0, 40.0, 35.0, 30.0, 25.0, 20.0, 15.0, 10.0, 5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0, 65.0]
-E = [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
-b = 0.0001
-c = 1.5
-σ = 1.0
-Δt = 1.0
-
-# Solve the reservoir equation
-sol_t = 1:30
-sol_u = []
-
-# Initial condition for the first time step
-
-for i in eachindex(sol_t)
-    sol = solve_reservoir(S_initial,s_max, P[1:i], E[1:i], b, c, σ, Δt)
-    push!(sol_u, sol.u[end][1])
-    global S_initial = sol.u[end][1]
-end
-
-# Plot the results
-plot(sol_t, sol_u, xlabel="Time (days)", ylabel="Storage (cubic meters)", title="Reservoir Storage Over Time", legend=false)
 
