@@ -1,5 +1,4 @@
 using DifferentialEquations
-using Plots
 
 
 
@@ -71,10 +70,6 @@ end
 
 # Plot the results
 plot(sol_t, sol_u, xlabel="Time (days)", ylabel="Storage (cubic meters)", title="Reservoir Storage Over Time", legend=false)
-
-
-
-
 
 """
 
