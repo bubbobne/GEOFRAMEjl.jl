@@ -12,4 +12,9 @@ include("io_tests.jl")
     @testset "IO Module Tests" begin
         include("io_tests.jl")  # These should contain tests specific to the IO module
     end
+
+    @testset "Outlier Module Tests" begin
+        include("outlier_test.jl")  # These should contain tests specific to the outlier module
+    end
+
 end
