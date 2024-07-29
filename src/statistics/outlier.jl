@@ -1,4 +1,4 @@
-using TimeSeries, Statistics, Dates, Distributions
+using TimeSeries, Statistics, Dates, Distributions, DataFrames, IsolationForest
 """
         find_outliers(timearray::TimeArray, method::String = "Tukey")
 
@@ -19,30 +19,33 @@ using TimeSeries, Statistics, Dates, Distributions
     outliers = find_outliers(ta)
     println(outliers)
 """
-function find_outliers(timearray::TimeArray; method::String="Tukey", threshold::Float64=3.5)
+function find_outliers(timearray::TimeArray; method::String="Tukey", threshold::Float64=3.5, contamination::Float64=0.1)
     data = values(timearray)
     outlier_indices = Int[]
 
     # Determine which method to use for finding outliers
-    if method == "Tukey"
-        outlier_indices = tukey(data)
-    elseif method == "TukeyHD"
-        outlier_indices = tukey_hd(data)
-    elseif method == "MAD"
-        outlier_indices = mad_outliers(data, threshold=threshold)
-    elseif method == "MADHD"
-        outlier_indices = mad_hd(data, threshold=threshold)
-    elseif method == "DMAD"
-        outlier_indices = double_mad(data, threshold=threshold)
-    elseif method == "DMADHD"
-        outlier_indices = double_mad_hd(data, threshold=threshold)
+    if method == "IsolationForest"
+        return detect_outliers_isolation_forest(timearray, contamination=contamination)
     else
-        error("Unsupported method: $method")
+        if method == "Tukey"
+            outlier_indices = tukey(data)
+        elseif method == "TukeyHD"
+            outlier_indices = tukey_hd(data)
+        elseif method == "MAD"
+            outlier_indices = mad_outliers(data, threshold=threshold)
+        elseif method == "MADHD"
+            outlier_indices = mad_hd(data, threshold=threshold)
+        elseif method == "DMAD"
+            outlier_indices = double_mad(data, threshold=threshold)
+        elseif method == "DMADHD"
+            outlier_indices = double_mad_hd(data, threshold=threshold)
+        else
+            error("Unsupported method: $method")
+        end
+        # Extract the dates and values of the outliers
+        outliers = timearray[outlier_indices]
+        return outliers
     end
-
-    # Extract the dates and values of the outliers
-    outliers = timearray[outlier_indices]
-    return outliers
 end
 
 
@@ -155,9 +158,9 @@ end
 
 """
 
-function mad_outliers(data::AbstractVector; threshold::Float64=3.5)
+function mad_outliers(data::AbstractVector; threshold::Float64=3.0)
     median_value = median(data)
-    mad =1.4826 * median(abs.(data .- median_value))
+    mad = 1.4826 * median(abs.(data .- median_value))
     lower_bound = median_value - threshold * mad
     upper_bound = median_value + threshold * mad
     # Find the indices of the outliers
@@ -183,9 +186,9 @@ end
     println(outlier_indices)
 
 """
-function mad_hd(data::AbstractVector; threshold::Float64=3.5)
+function mad_hd(data::AbstractVector; threshold::Float64=3.0)
     median_value = harrell_davis_quantile(data, 0.5)
-    mad =1.4826 * harrell_davis_quantile(abs.(data .- median_value), 0.5)
+    mad = 1.4826 * harrell_davis_quantile(abs.(data .- median_value), 0.5)
     lower_bound = median_value - threshold * mad
     upper_bound = median_value + threshold * mad
     # Find the indices of the outliers
@@ -214,10 +217,10 @@ end
     println(outlier_indices)
 
 """
-function double_mad(data::AbstractVector; threshold::Float64=3.5)
+function double_mad(data::AbstractVector; threshold::Float64=3.0)
     median_value = median(data)
-    left_mad = 1.4826 *median(abs.(data[data.<=median_value] .- median_value))
-    right_mad = 1.4826 *median(abs.(data[data.>=median_value] .- median_value))
+    left_mad = 1.4826 * median(abs.(data[data.<=median_value] .- median_value))
+    right_mad = 1.4826 * median(abs.(data[data.>=median_value] .- median_value))
     lower_bound = median_value - threshold * left_mad
     upper_bound = median_value + threshold * right_mad
     # Find the indices of the outliers
@@ -245,7 +248,7 @@ end
     println(outlier_indices)
 
 """
-function double_mad_hd(data::AbstractVector; threshold::Float64=3.5)
+function double_mad_hd(data::AbstractVector; threshold::Float64=3.0)
     median_value = harrell_davis_quantile(data, 0.5)
     left_mad = 1.4826 * harrell_davis_quantile(abs.(data[data.<=median_value] .- median_value), 0.5)
     right_mad = 1.4826 * harrell_davis_quantile(abs.(data[data.>=median_value] .- median_value), 0.5)
@@ -255,3 +258,19 @@ function double_mad_hd(data::AbstractVector; threshold::Float64=3.5)
     outlier_indices = findall(x -> x < lower_bound || x > upper_bound, data)
     return outlier_indices
 end
+
+# function detect_outliers_isolation_forest(timearray::TimeArray; contamination::Float64=0.1)
+#     data = DataFrame(Date = timearray.timestamp, Precipitation = timearray.values)
+    
+#     # Fit Isolation Forest
+#     iso_forest = IsolationForest(contamination=contamination)
+#     fit!(iso_forest, data[:, "Precipitation"])
+    
+#     # Predict outliers
+#     data.Outlier = predict(iso_forest, data[:, "Precipitation"])
+    
+#     # Extract the dates and values of the outliers
+#     outliers = data[data.Outlier .== -1, :]
+    
+#     return outliers
+# end
