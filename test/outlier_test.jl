@@ -77,7 +77,7 @@ expected_outliers = Dict(
 )
 
 # Convert sample arrays to TimeArrays
-function create_timearray(data::Vector{Int})
+function create_timearray(data::AbstractMatrix)
     dates = Date(2023, 1, 1):Day(1):(Date(2023, 1, 1) + Day(length(data) - 1))
     TimeArray(dates, data)
 end
@@ -88,16 +88,21 @@ end
         sample_name = parts[1]
         method_name = parts[2]
         sample = eval(Symbol(sample_name))
-        ta = create_timearray(sample)
+        float_vector = Float64.(sample)
+
+        # Step 3: Reshape the vector into a single-column matrix
+        single_column_matrix = reshape(float_vector, :, 1)
+        ta = create_timearray(single_column_matrix)
         outliers = GFStatistics.find_outliers(ta; method=String(method_name), threshold=3.0)
         # Debugging output
         println("Method: ", method_name, ", Sample: ", sample_name)
         println("Expected: ", sort(expected))
-        println("Actual: ", sort(values(outliers)))
+        println("Actual: ", sort(values(outliers[1])))
 
-        @test length(values(outliers)) == length(expected)
-        if length(values(outliers)) == length(expected)
-            @test isapprox(sort(values(outliers)), sort(expected), rtol=1e-5, atol=1e-5)
+        @test length(values(outliers[1])) == length(expected)
+        if length(values(outliers[1])) == length(expected)
+            @test isapprox(sort(values(outliers[1])), sort(expected), rtol=1e-5, atol=1e-5)
+            GFStatistics.find_outliers(ta; method="IsolationForest", contamination=0.2)
         end
     end
 end

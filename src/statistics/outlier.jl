@@ -1,4 +1,42 @@
-using TimeSeries, Statistics, Dates, Distributions, DataFrames, IsolationForest
+using TimeSeries, Statistics, Dates, Distributions, DataFrames
+using OutlierDetection, OutlierDetectionPython
+
+
+
+clean = data -> collect(skipmissing(data))
+
+"""
+harrell_davis_quantile(data::AbstractVector, prob::Float64)
+
+Estimates the quantile of the data using the Harrell-Davis method.
+Arguments
+
+    data::AbstractVector: The data to analyze.
+    prob::Float64: The probability for the quantile (e.g., 0.25 for the 25th percentile).
+
+Returns
+
+    The estimated quantile value.
+
+Example
+data = [10, 12, 10, 15, 100, 10, 11, 10, 14, 13]
+q1 = harrell_davis_quantile(data, 0.25)
+println(q1)
+
+"""
+function harrell_davis_quantile(data::AbstractVector, prob::Float64)
+    clean_data = clean(data)
+    n = length(clean_data)
+    if n == 0
+        return NaN
+    end
+    data_sorted = sort(clean_data)
+    weights = [pdf(Beta(n * prob + 1, n * (1 - prob) + 1), (i - 0.5) / n) for i in 1:n]
+    return sum(data_sorted .* weights) / sum(weights)
+end
+
+
+
 """
         find_outliers(timearray::TimeArray, method::String = "Tukey")
 
@@ -21,31 +59,49 @@ using TimeSeries, Statistics, Dates, Distributions, DataFrames, IsolationForest
 """
 function find_outliers(timearray::TimeArray; method::String="Tukey", threshold::Float64=3.5, contamination::Float64=0.1)
     data = values(timearray)
-    outlier_indices = Int[]
+    ts = timestamp(timearray)
+    outlier_indices = []
 
-    # Determine which method to use for finding outliers
+    # Method mapping with parameters
+    methods = Dict(
+        "Tukey" => (tukey, NamedTuple()),
+        "TukeyHD" => (tukey_hd, NamedTuple()),
+        "MAD" => (mad_outliers, (threshold=threshold,)),
+        "MADHD" => (mad_hd, (threshold=threshold,)),
+        "DMAD" => (double_mad, (threshold=threshold,)),
+        "DMADHD" => (double_mad_hd, (threshold=threshold,))
+    )
+
+    # Handle IsolationForest separately
     if method == "IsolationForest"
         return detect_outliers_isolation_forest(timearray, contamination=contamination)
-    else
-        if method == "Tukey"
-            outlier_indices = tukey(data)
-        elseif method == "TukeyHD"
-            outlier_indices = tukey_hd(data)
-        elseif method == "MAD"
-            outlier_indices = mad_outliers(data, threshold=threshold)
-        elseif method == "MADHD"
-            outlier_indices = mad_hd(data, threshold=threshold)
-        elseif method == "DMAD"
-            outlier_indices = double_mad(data, threshold=threshold)
-        elseif method == "DMADHD"
-            outlier_indices = double_mad_hd(data, threshold=threshold)
-        else
-            error("Unsupported method: $method")
-        end
-        # Extract the dates and values of the outliers
-        outliers = timearray[outlier_indices]
-        return outliers
     end
+
+    # Get the appropriate method and its parameters
+    if haskey(methods, method)
+        outlier_method, params = methods[method]
+    else
+        error("Unsupported method: $method")
+    end
+
+    # Collect outlier indices for each column
+    for col in eachcol(data)
+        if isempty(params)
+            push!(outlier_indices, outlier_method(col))
+        else
+            push!(outlier_indices, outlier_method(col; params...))
+        end
+    end
+
+    # Construct the TimeArray of outliers
+    outliers = TimeArray[]
+    for (col_index, indices) in enumerate(outlier_indices)
+        outlier_dates = ts[indices]
+        outlier_values = data[indices, col_index]
+        push!(outliers, TimeArray(outlier_dates, outlier_values))
+    end
+
+    return outliers
 end
 
 
@@ -69,15 +125,14 @@ end
     outlier_indices = tukey(data)
     println(outlier_indices)
 """
-function tukey(data)
-    q1 = quantile(data, 0.25)
-    q3 = quantile(data, 0.75)
+function tukey(data::AbstractVector{Float64})
+    q1 = quantile(clean(data), 0.25)
+    q3 = quantile(clean(data), 0.75)
     iqr = q3 - q1
     lower_bound = q1 - 1.5 * iqr
     upper_bound = q3 + 1.5 * iqr
-    # Find the indices of the outliers
-    outlier_indices = findall(x -> x < lower_bound || x > upper_bound, data)
-    return outlier_indices
+    return findall(x -> x < lower_bound || x > upper_bound, data)
+
 end
 
 """
@@ -101,43 +156,16 @@ outlier_indices = tukey_hd(data)
 println(outlier_indices)
 
 """
-function tukey_hd(data::AbstractVector)
+function tukey_hd(data::AbstractVector{Float64})
     q1 = harrell_davis_quantile(data, 0.25)
     q3 = harrell_davis_quantile(data, 0.75)
     iqr = q3 - q1
     lower_bound = q1 - 1.5 * iqr
     upper_bound = q3 + 1.5 * iqr
-    # Find the indices of the outliers
-    outlier_indices = findall(x -> x < lower_bound || x > upper_bound, data)
-    return outlier_indices
+    return findall(x -> x < lower_bound || x > upper_bound, data)
+
 end
 
-"""
-harrell_davis_quantile(data::AbstractVector, prob::Float64)
-
-Estimates the quantile of the data using the Harrell-Davis method.
-Arguments
-
-    data::AbstractVector: The data to analyze.
-    prob::Float64: The probability for the quantile (e.g., 0.25 for the 25th percentile).
-
-Returns
-
-    The estimated quantile value.
-
-Example
-data = [10, 12, 10, 15, 100, 10, 11, 10, 14, 13]
-q1 = harrell_davis_quantile(data, 0.25)
-println(q1)
-
-"""
-
-function harrell_davis_quantile(data::AbstractVector, prob::Float64)
-    n = length(data)
-    data_sorted = sort(data)
-    weights = [pdf(Beta(n * prob + 1, n * (1 - prob) + 1), (i - 0.5) / n) for i in 1:n]
-    return sum(data_sorted .* weights) / sum(weights)
-end
 
 
 """
@@ -158,14 +186,13 @@ end
 
 """
 
-function mad_outliers(data::AbstractVector; threshold::Float64=3.0)
-    median_value = median(data)
-    mad = 1.4826 * median(abs.(data .- median_value))
+function mad_outliers(data::AbstractVector{Float64}; threshold::Float64=3.0)
+    median_value = median(clean(data))
+    mad = 1.4826 * median(abs.(clean(data) .- median_value))
     lower_bound = median_value - threshold * mad
     upper_bound = median_value + threshold * mad
-    # Find the indices of the outliers
-    outlier_indices = findall(x -> x < lower_bound || x > upper_bound, data)
-    return outlier_indices
+    return findall(x -> x < lower_bound || x > upper_bound, data)
+
 end
 
 """
@@ -186,14 +213,13 @@ end
     println(outlier_indices)
 
 """
-function mad_hd(data::AbstractVector; threshold::Float64=3.0)
+function mad_hd(data::AbstractVector{Float64}; threshold::Float64=3.0)
     median_value = harrell_davis_quantile(data, 0.5)
     mad = 1.4826 * harrell_davis_quantile(abs.(data .- median_value), 0.5)
     lower_bound = median_value - threshold * mad
     upper_bound = median_value + threshold * mad
-    # Find the indices of the outliers
-    outlier_indices = findall(x -> x < lower_bound || x > upper_bound, data)
-    return outlier_indices
+    return findall(x -> x < lower_bound || x > upper_bound, data)
+
 end
 
 
@@ -217,15 +243,13 @@ end
     println(outlier_indices)
 
 """
-function double_mad(data::AbstractVector; threshold::Float64=3.0)
-    median_value = median(data)
-    left_mad = 1.4826 * median(abs.(data[data.<=median_value] .- median_value))
-    right_mad = 1.4826 * median(abs.(data[data.>=median_value] .- median_value))
+function double_mad(data::AbstractVector{Float64}; threshold::Float64=3.0)
+    median_value = median(clean(data))
+    left_mad = 1.4826 * median(abs.(clean(data[data.<=median_value]) .- median_value))
+    right_mad = 1.4826 * median(abs.(clean(data[data.>=median_value]) .- median_value))
     lower_bound = median_value - threshold * left_mad
     upper_bound = median_value + threshold * right_mad
-    # Find the indices of the outliers
-    outlier_indices = findall(x -> x < lower_bound || x > upper_bound, data)
-    return outlier_indices
+    return findall(x -> x < lower_bound || x > upper_bound, data)
 end
 
 """
@@ -248,29 +272,64 @@ end
     println(outlier_indices)
 
 """
-function double_mad_hd(data::AbstractVector; threshold::Float64=3.0)
+function double_mad_hd(data::AbstractVector{Float64}; threshold::Float64=3.0)
     median_value = harrell_davis_quantile(data, 0.5)
     left_mad = 1.4826 * harrell_davis_quantile(abs.(data[data.<=median_value] .- median_value), 0.5)
     right_mad = 1.4826 * harrell_davis_quantile(abs.(data[data.>=median_value] .- median_value), 0.5)
     lower_bound = median_value - threshold * left_mad
     upper_bound = median_value + threshold * right_mad
-    # Find the indices of the outliers
-    outlier_indices = findall(x -> x < lower_bound || x > upper_bound, data)
-    return outlier_indices
+    col_indices = findall(x -> x < lower_bound || x > upper_bound, data)
+    return col_indices
 end
 
+
+
 # function detect_outliers_isolation_forest(timearray::TimeArray; contamination::Float64=0.1)
-#     data = DataFrame(Date = timearray.timestamp, Precipitation = timearray.values)
-    
-#     # Fit Isolation Forest
-#     iso_forest = IsolationForest(contamination=contamination)
-#     fit!(iso_forest, data[:, "Precipitation"])
-    
-#     # Predict outliers
-#     data.Outlier = predict(iso_forest, data[:, "Precipitation"])
-    
-#     # Extract the dates and values of the outliers
-#     outliers = data[data.Outlier .== -1, :]
-    
-#     return outliers
+
+#     for col in eachcol(values(timearray))
+
+#         df = DataFrame(timestamp=1:length(timearray), value=values(col))
+
+#         # Create rolling windows of size 10
+#         window_size = 10
+#         function create_windows(df, window_size)
+#             n = size(df, 1)
+#             windows = []
+#             for i in 1:(n-window_size+1)
+#                 push!(windows, df[i:(i+window_size-1), :])
+#             end
+#             return windows
+#         end
+
+#         windows = create_windows(df, window_size)
+
+#         # Extract features from each window
+#         function extract_features(window)
+#             return [mean(window.value), std(window.value), maximum(window.value), minimum(window.value)]
+#         end
+
+#         X = [extract_features(win) for win in windows]
+#         X = vcat(X...)
+
+#         # Initialize the Isolation Forest model
+#         model = OutlierDetectionPython.IForestDetector()
+
+#         # Fit the model to the data
+#         fit!(model, X)
+#         outlier_scores = score(model, X)
+
+#         # Determine the threshold to identify outliers
+#         threshold = quantile(outlier_scores, 0.9)  # 90th percentile as an example threshold
+#         outlier_indices = findall(outlier_scores .> threshold)
+        
+#         # Identify outlier windows
+#         outlier_windows = windows[outlier_indices]
+        
+#         println("Outlier windows detected:")
+#         for (i, win) in enumerate(outlier_windows)
+#             println("Window $i:")
+#             println(win)
+#         end
+#     end
+
 # end

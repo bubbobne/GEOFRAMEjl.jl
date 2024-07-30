@@ -44,18 +44,23 @@ Reads an OMS file (format as csv) from the specified path and returns a time ser
 julia> ts = read_timeseries("data/timeseries.csv")
 TimeSeries(...)
 """
-
 function read_OMS_timeserie(filepath::String)
-    # Initialize arrays for timestamps and values
+    # Initialize a dictionary to store values for each ID
+    data_dict = Dict{Symbol, Vector{Float64}}()
     timestamps = DateTime[]
-    values = Float64[]
-    column_name = ""
+    column_names = Symbol[]
     open(filepath, "r") do file
         lines = readlines(file)
 
-        # Extract column name from the line starting with "ID,,"
+        # Extract column names from the line starting with "ID,,"
         id_line = findfirst(l -> startswith(l, "ID,,"), lines)
-        column_name = split(lines[id_line], ",")[3]
+        column_names = Symbol.(split(lines[id_line], ",")[3:end])
+
+        # Initialize the dictionary with column names
+        for name in column_names
+            data_dict[name] = Float64[]
+        end
+
         format_line = findfirst(l -> startswith(l, "Format,"), lines)
         date_format = correct_date_format!(String(split(lines[format_line], ",")[2]))
 
@@ -66,19 +71,27 @@ function read_OMS_timeserie(filepath::String)
         for i in start_index:length(lines)
             line = lines[i]
             data = filter(!isempty, split(line, ","))
+
             try
                 timestamp = DateTime(data[1], date_format)
-                value = parse(Float64, data[2])
                 push!(timestamps, timestamp)
-                push!(values, value)
+                for (j, name) in enumerate(column_names)
+                    value = parse(Float64, data[j + 1])
+                    push!(data_dict[name], value)
+                end
             catch error
                 println("Error parsing line $i: $error")
             end
         end
     end
-    # Return as a TimeArray using the extracted column name
-    return TimeArray(timestamps, values, Symbol.([column_name]))
+
+    # Convert dictionary values to a matrix
+    values_matrix = hcat(values(data_dict)...)
+
+    # Return as a TimeArray
+    return TimeArray(timestamps, values_matrix, column_names)
 end
+
 
 
 

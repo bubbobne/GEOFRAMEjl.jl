@@ -27,3 +27,4 @@ desktop.ini # Windows folders customization
 # Other common directories not to track
 build/
 docs/build/
+.CondaPkg/
