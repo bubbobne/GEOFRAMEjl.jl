@@ -2,7 +2,8 @@ using TimeSeries, Statistics, Dates, Distributions, DataFrames
 
 
 
-clean = data -> collect(skipmissing(data))
+clean = data -> filter(isfinite, data)
+
 
 """
 harrell_davis_quantile(data::AbstractVector, prob::Float64)
@@ -60,7 +61,6 @@ function find_outliers(timearray::TimeArray; method::String="Tukey", threshold::
     data = values(timearray)
     ts = timestamp(timearray)
     outlier_indices = []
-
     # Method mapping with parameters
     methods = Dict(
         "Tukey" => (tukey, NamedTuple()),
@@ -79,10 +79,14 @@ function find_outliers(timearray::TimeArray; method::String="Tukey", threshold::
 
     # Collect outlier indices for each column
     for col in eachcol(data)
-        if isempty(params)
-            push!(outlier_indices, outlier_method(col))
+        if isempty(col)
+            outlier_indices = []
         else
-            push!(outlier_indices, outlier_method(col; params...))
+            if isempty(params)
+                push!(outlier_indices, outlier_method(col))
+            else
+                push!(outlier_indices, outlier_method(col; params...))
+            end
         end
     end
 
@@ -119,13 +123,18 @@ end
     println(outlier_indices)
 """
 function tukey(data::AbstractVector{Float64})
-    q1 = quantile(clean(data), 0.25)
-    q3 = quantile(clean(data), 0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
-    return findall(x -> x < lower_bound || x > upper_bound, data)
+    d = clean(data)
+    if isempty(d)
+        return []
+    else
+        q1, q3 = quantile(d, [0.25, 0.75])
+        iqr = q3 - q1
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+        print(q3)
 
+        return findall(x -> x < lower_bound || x > upper_bound, data)
+    end
 end
 
 """
