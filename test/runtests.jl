@@ -11,13 +11,13 @@ include("io_tests.jl")
         include("outlier_test.jl")  # These should contain tests specific to the outlier module
     end
 
-    # @testset "Geo Module Tests" begin
-    #     include("gof_test.jl")  # These should contain tests specific to the Geo module
-    # end
+    @testset "Geo Module Tests" begin
+        include("gof_test.jl")  # These should contain tests specific to the Geo module
+    end
 
-    # @testset "IO Module Tests" begin
-    #     include("io_tests.jl")  # These should contain tests specific to the IO module
-    # end
+    @testset "IO Module Tests" begin
+        include("io_tests.jl")  # These should contain tests specific to the IO module
+    end
 
 
 end

@@ -1,5 +1,4 @@
 using TimeSeries, Statistics, Dates, Distributions, DataFrames
-using OutlierDetection, OutlierDetectionPython
 
 
 
@@ -71,12 +70,6 @@ function find_outliers(timearray::TimeArray; method::String="Tukey", threshold::
         "DMAD" => (double_mad, (threshold=threshold,)),
         "DMADHD" => (double_mad_hd, (threshold=threshold,))
     )
-
-    # Handle IsolationForest separately
-    if method == "IsolationForest"
-        return detect_outliers_isolation_forest(timearray, contamination=contamination)
-    end
-
     # Get the appropriate method and its parameters
     if haskey(methods, method)
         outlier_method, params = methods[method]
@@ -281,55 +274,3 @@ function double_mad_hd(data::AbstractVector{Float64}; threshold::Float64=3.0)
     col_indices = findall(x -> x < lower_bound || x > upper_bound, data)
     return col_indices
 end
-
-
-
-# function detect_outliers_isolation_forest(timearray::TimeArray; contamination::Float64=0.1)
-
-#     for col in eachcol(values(timearray))
-
-#         df = DataFrame(timestamp=1:length(timearray), value=values(col))
-
-#         # Create rolling windows of size 10
-#         window_size = 10
-#         function create_windows(df, window_size)
-#             n = size(df, 1)
-#             windows = []
-#             for i in 1:(n-window_size+1)
-#                 push!(windows, df[i:(i+window_size-1), :])
-#             end
-#             return windows
-#         end
-
-#         windows = create_windows(df, window_size)
-
-#         # Extract features from each window
-#         function extract_features(window)
-#             return [mean(window.value), std(window.value), maximum(window.value), minimum(window.value)]
-#         end
-
-#         X = [extract_features(win) for win in windows]
-#         X = vcat(X...)
-
-#         # Initialize the Isolation Forest model
-#         model = OutlierDetectionPython.IForestDetector()
-
-#         # Fit the model to the data
-#         fit!(model, X)
-#         outlier_scores = score(model, X)
-
-#         # Determine the threshold to identify outliers
-#         threshold = quantile(outlier_scores, 0.9)  # 90th percentile as an example threshold
-#         outlier_indices = findall(outlier_scores .> threshold)
-        
-#         # Identify outlier windows
-#         outlier_windows = windows[outlier_indices]
-        
-#         println("Outlier windows detected:")
-#         for (i, win) in enumerate(outlier_windows)
-#             println("Window $i:")
-#             println(win)
-#         end
-#     end
-
-# end

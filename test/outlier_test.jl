@@ -102,7 +102,6 @@ end
         @test length(values(outliers[1])) == length(expected)
         if length(values(outliers[1])) == length(expected)
             @test isapprox(sort(values(outliers[1])), sort(expected), rtol=1e-5, atol=1e-5)
-            GFStatistics.find_outliers(ta; method="IsolationForest", contamination=0.2)
         end
     end
 end
