@@ -44,7 +44,7 @@ Reads an OMS file (format as csv) from the specified path and returns a time ser
 julia> ts = read_timeseries("data/timeseries.csv")
 TimeSeries(...)
 """
-function read_OMS_timeserie(filepath::String)
+function read_OMS_timeserie(filepath::String; no_value=-9999)
     # Initialize a dictionary to store values for each ID
     data_dict = Dict{Symbol, Vector{Float64}}()
     timestamps = DateTime[]
@@ -69,6 +69,7 @@ function read_OMS_timeserie(filepath::String)
 
         # Iterate over the lines containing data
         for i in start_index:length(lines)
+
             line = lines[i]
             data = filter(!isempty, split(line, ","))
 
@@ -79,6 +80,7 @@ function read_OMS_timeserie(filepath::String)
                     value = parse(Float64, data[j + 1])
                     push!(data_dict[name], value)
                 end
+    
             catch error
                 println("Error parsing line $i: $error")
             end
@@ -86,8 +88,8 @@ function read_OMS_timeserie(filepath::String)
     end
 
     # Convert dictionary values to a matrix
-    values_matrix = hcat(values(data_dict)...)
-
+    values_matrix = hcat([data_dict[key] for key in column_names]...)
+    values_matrix[values_matrix.==no_value].=NaN
     # Return as a TimeArray
     return TimeArray(timestamps, values_matrix, column_names)
 end
