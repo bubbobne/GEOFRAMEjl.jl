@@ -109,39 +109,47 @@ Write a time series as OMS file (format as csv) to the specified path.
 ```julia-repl
 julia> write_timeseries("data/timeseries.csv")
 """
-function write_OMS_timeserie(ta::TimeArray, file_path::String)
+function write_OMS_timeserie(ta::TimeArray, file_path::String; timestamp_format = "yyyy-mm-dd HH:MM", author = "GEOFramejl package")
     try
         column_names = colnames(ta)
         column_header = join(["value_" * string(name) for name in column_names], ",")
-        type_strings = []
-        for col in column_names
-            col_type = typeof(values(ta[Symbol(col)])[1])
-            if col_type <: Float64 || col_type <: Float32
-                push!(type_strings, "Double")
-            elseif col_type <: Integer
-                push!(type_strings, "Integer")
+        
+        function col_type(values)
+            first_value = values[1]
+            if first_value isa Float64 || first_value isa Float32
+                return "double"
+            elseif first_value isa Integer
+                return "integer"
             else
-                push!(type_strings, "Unknown")  # Fallback type
+                return "unknown"  # Fallback type
             end
         end
+        # Precompute column types
+        type_strings = [col_type(ta[:, Symbol(col)]) for col in column_names]
+        
 
-        # Ope
+
+        # Cache the values and symbols
+        ta_symbols = Symbol.(column_names)
+        ta_values = [values(ta[:, sym]) for sym in ta_symbols]
+
+        # Open file and write header
         open(file_path, "w") do f
             write(f, "@T,table\n")
-            write(f, "Created,$(Dates.format(now(), "yyyy-mm-dd HH:MM"))\n")
-            write(f, "Author,GEOFramejl package\n")
+            write(f, "Created,$(Dates.format(now(), timestamp_format))\n")
+            write(f, "Author, $author\n")
             write(f, "@H,timestamp,$column_header\n")
             write(f, "ID,," * join(column_names, ",") * "\n")
             write(f, "Type,Date," * join(type_strings, ",") * "\n")
-            timestamp_format = "yyyy-mm-dd HH:MM"
             format_row = timestamp_format * join(fill(",", length(column_names)), "")
             write(f, "Format,$format_row,\n")
-
+            
+            # Write data
             for i in eachindex(timestamp(ta))
-                formatted_timestamp = Dates.format(timestamp(ta)[i], "yyyy-mm-dd HH:MM")
-                values_to_write = [values(ta[Symbol(name)])[i] for name in column_names]
+                formatted_timestamp = Dates.format(timestamp(ta)[i], timestamp_format)
+                values_to_write = [ta_values[j][i] for j in 1:length(ta_values)]
                 value_line = join(values_to_write, ",")
-                write(f, ",$formatted_timestamp,$value_line\n")
+                write(f, "$formatted_timestamp,$value_line\n")
             end
         end
         return true
